@@ -68,3 +68,50 @@ jobs:
             Write-Error "Le déploiement a altéré la conformité d'un service critique. Rollback requis !"
             exit 1
         }
+name: CI/CD - Déploiement Sécurité Infogérée
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  Validation-CI:
+    runs-on: windows-latest
+    steps:
+    - name: Récupérer le code source
+      uses: actions/checkout@v4
+
+    - name: Analyse statique de sécurité (PSScriptAnalyzer)
+      shell: pwsh
+      run: |
+        Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck
+        $errors = Invoke-ScriptAnalyzer -Path "./scripts" -Recurse -Severity Error
+        if ($errors) {
+            Write-Error "Des vulnérabilités ou erreurs ont été trouvées dans les scripts !"
+            exit 1
+        }
+
+  Deploiement-CD:
+    needs: Validation-CI
+    environment: Production
+    runs-on: windows-latest 
+    steps:
+    - name: Récupérer le code source
+      uses: actions/checkout@v4
+
+    - name: Exécuter le script de durcissement (GPO/JEA)
+      shell: pwsh
+      env:
+        SECURE_PWD: ${{ secrets.ADMIN_PASSWORD }} 
+      run: |
+        ./scripts/Apply-Hardening.ps1 -SecretPassword "$env:SECURE_PWD" -Environment "Production"
+
+    - name: Vérification post-déploiement (Tests Pester)
+      shell: pwsh
+      run: |
+        Install-Module -Name Pester -Force -SkipPublisherCheck
+        $result = Invoke-Pester -Path "./tests/Infrastructure.Tests.ps1" -Passthru
+        if ($result.FailedCount -gt 0) {
+            Write-Error "Le déploiement a altéré la conformité d'un service critique. Rollback requis !"
+            exit 1
+        }
