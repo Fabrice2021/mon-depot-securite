@@ -34,7 +34,8 @@ jobs:
       env:
         SECURE_PWD: ${{ secrets.ADMIN_PASSWORD }} 
       run: |
-        ./scripts/Apply-Hardening.ps1 -SecretPassword "$env:SECURE_PWD" -Environment "Production"
+        # Ajout du paramètre -AllowRestart $false à la fin de la ligne
+        ./scripts/Apply-Hardening.ps1 -SecretPassword "$env:SECURE_PWD" -Environment "Production" -AllowRestart $false
 
     - name: Vérification post-déploiement (Tests Pester)
       shell: pwsh
